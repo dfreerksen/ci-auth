@@ -434,7 +434,7 @@ class Auth {
 			if ($key != $this->_auth_users_fields['id'])
 			{
 				// General user information
-				if (in_array($key, array_keys($this->_auth_users_fields)))
+				if (in_array($key, array_values($this->_auth_users_fields)))
 				{
 					// Make sure the password is hashed if it exists
 					if ($key == $this->_auth_users_fields['password'])
@@ -453,8 +453,8 @@ class Auth {
 				else
 				{
 					$meta[] = array(
-						$this->_auth_users_fields['key'] => $key,
-						$this->_auth_users_fields['value'] => $value
+						$this->_auth_user_meta_fields['key'] => $key,
+						$this->_auth_user_meta_fields['value'] => $value
 					);
 				}
 			}
@@ -470,7 +470,7 @@ class Auth {
 		// Update user meta data
 		if ( ! empty($meta))
 		{
-			$this->ci->db->update_batch($this->_auth_table_user_meta, $meta, $this->_auth_users_fields['key']);
+			$this->ci->db->update_batch($this->_auth_table_user_meta, $meta, $this->_auth_user_meta_fields['key']);
 		}
 
 		return TRUE;
