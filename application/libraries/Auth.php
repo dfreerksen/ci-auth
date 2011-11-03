@@ -1,8 +1,18 @@
-<?php if (!defined('BASEPATH')) exit('No direct script access allowed');
-
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+/**
+ * CodeIgniter Auth Class
+ *
+ * This class enables users to log in, log out, and update their profile.
+ *
+ * @package     CodeIgniter
+ * @subpackage  Libraries
+ * @category    Libraries
+ * @author      David Freerksen
+ * @link        https://github.com/dfreerksen/ci-auth
+ */
 class Auth {
 
-	protected $ci;
+	protected $CI;
 
 	protected $_auth_cookie_expire = 0;
 
@@ -21,12 +31,10 @@ class Auth {
 	protected $_auth_table_user_meta = 'user_meta';
 	protected $_auth_user_meta_fields = array(
 		'id' => 'id',
-		'user_id' => 'user_id',
-		'key' => 'key',
-		'value' => 'value'
+		'user_id' => 'user_id'
 	);
 
-	protected $_auth_key = 'user_id';
+	protected $_auth_user_session_key = 'user_id';
 
 	/**
 	 * Constructor
@@ -35,10 +43,13 @@ class Auth {
 	 */
 	public function __construct($config = array())
 	{
-		$this->ci =& get_instance();
+		$this->CI =& get_instance();
 
 		// Load session library
-		$this->ci->load->library('session');
+		$this->CI->load->library('session');
+
+		// Load Auth model
+		$this->CI->load->model('auth_model');
 
 		if ( ! empty($config))
 		{
@@ -74,9 +85,9 @@ class Auth {
 	 * @param   string  $name
 	 * @return  mixed
 	 */
-	public function __get($name)
+	public function __get($key)
 	{
-		return isset($this->{'_' . $name}) ? $this->{'_' . $name} : NULL;
+		return isset($this->{'_'.$key}) ? $this->{'_'.$key} : NULL;
 	}
 
 	// ------------------------------------------------------------------------
@@ -86,12 +97,13 @@ class Auth {
 	 *
 	 * @param   string  $name
 	 * @param   mixed   $value
+	 * @return  void
 	 */
-	public function __set($name, $value)
+	public function __set($key, $value)
 	{
-		if (isset($this->{'_' . $name}))
+		if (isset($this->{'_'.$key}))
 		{
-			$this->{'_' . $name} = $value;
+			$this->{'_'.$key} = $value;
 		}
 	}
 
@@ -104,23 +116,22 @@ class Auth {
 	 */
 	public function logged_in()
 	{
-		$in = FALSE;
-
 		// User is logged in with session
-		if ($this->ci->session->userdata($this->_auth_key) !== FALSE)
+		if ($this->CI->session->userdata($this->_auth_user_session_key) !== FALSE)
 		{
-			$in = TRUE;
+			return TRUE;
 		}
 
 		// User has a cookie set. Create session
-		elseif ($this->ci->input->cookie($this->_auth_key) !== FALSE)
+		elseif ($this->CI->input->cookie($this->_auth_user_session_key) !== FALSE)
 		{
-			$user_id = $this->ci->input->cookie($this->_auth_key);
+			$user_id = $this->CI->input->cookie($this->_auth_user_session_key);
 			$this->_set_session_values($user_id, TRUE);
-			$in = TRUE;
+
+			return TRUE;
 		}
 
-		return $in;
+		return FALSE;
 	}
 
 	// ------------------------------------------------------------------------
@@ -134,7 +145,7 @@ class Auth {
 	{
 		if ($this->logged_in())
 		{
-			return $this->ci->session->userdata($this->_auth_key);
+			return $this->CI->session->userdata($this->_auth_user_session_key);
 		}
 
 		return 0;
@@ -152,50 +163,18 @@ class Auth {
 	 */
 	public function login($username = '', $password = '', $cookie = FALSE)
 	{
-		$user_id = FALSE;
+		// Hash password
+		$password = $this->hash_password($password);
 
-		// Load email helper
-		$this->ci->load->helper('email');
+		$user_id = $this->CI->auth_model->valid_login($username, $password);
 
-		// Query
-		$this->ci->db->select($this->_auth_users_fields['id'].' as id')
-			->from($this->_auth_table_users);
-
-		if (valid_email($username))
-		{
-			$this->ci->db->where($this->_auth_users_fields['email'], $username);
-		}
-		else
-		{
-			$this->ci->db->where($this->_auth_users_fields['username'], $username);
-		}
-
-		$password = $this->_hash_password($password);
-
-		$this->ci->db->where($this->_auth_users_fields['password'], $password);
-
-		$query = $this->ci->db->get();
-
-		if ($query->num_rows() > 0)
-		{
-			$result = $query->row_array();
-
-			$user_id = $result['id'];
-		}
-
-		if ($user_id !== FALSE)
+		if ($user_id)
 		{
 			// Set the session
 			$this->_set_session_values($user_id, $cookie);
 
-			// Data for the update
-			$data = array(
-				$this->_auth_users_fields['last_login'] => date('Y-m-d H:i:s')
-			);
-
 			// Update the database with the last login time
-			$this->ci->db->where($this->_auth_users_fields['id'], $user_id)
-				->update($this->_auth_table_users, $data);
+			$this->CI->auth_model->update_last_login($user_id);
 		}
 
 		return $user_id;
@@ -210,17 +189,18 @@ class Auth {
 	 */
 	public function logout()
 	{
-		if ($this->ci->input->cookie($this->_auth_key) !== FALSE)
+		if ($this->CI->input->cookie($this->_auth_user_session_key) !== FALSE)
 		{
 			$cookie = array(
-				'name' => $this->_auth_key,
-				'value' => $this->ci->input->cookie($this->_auth_key),
+				'name' => $this->_auth_user_session_key,
+				'value' => $this->CI->input->cookie($this->_auth_user_session_key),
 				'expire' => ''
 			);
-			$this->ci->input->set_cookie($cookie);
+
+			$this->CI->input->set_cookie($cookie);
 		}
 
-		$this->ci->session->sess_destroy();
+		$this->CI->session->sess_destroy();
 
 		return TRUE;
 	}
@@ -264,7 +244,7 @@ class Auth {
 
 		$data = array_merge($data, array_filter($username));
 
-		$password = $this->_hash_password($data['password']);
+		$password = $this->hash_password($data['password']);
 
 		$data[$this->_auth_users_fields['password']] = $password;
 		$data[$this->_auth_users_fields['date_create']] = date('Y-m-d H:i:s');
@@ -284,13 +264,7 @@ class Auth {
 	 */
 	public function delete_user($id = 0)
 	{
-		// Delete data from users table
-		$this->ci->db->where($this->_auth_users_fields['id'], $id)
-			->delete($this->_auth_table_user_meta);
-
-		// Delete data from user meta table
-		$this->ci->db->where($this->_auth_user_meta_fields['user_id'], $id)
-			->delete($this->_auth_table_users);
+		$this->CI->auth_model->delete_user($id);
 
 		return TRUE;
 	}
@@ -305,32 +279,7 @@ class Auth {
 	 */
 	public function get_user($id = 0)
 	{
-		// Build select string
-		$select = '';
-		foreach ($this->_auth_users_fields as $key => $field)
-		{
-			// Add a comma to separate the fields
-			if ($select)
-			{
-				$select .= ', ';
-			}
-
-			$select .= $field.' as '.$key;
-		}
-
-		// Query
-		$this->ci->db->select($select)
-			->from($this->_auth_table_users)
-			->where($this->_auth_users_fields['id'], $id);
-
-		$query = $this->ci->db->get();
-
-		if ($query->num_rows() > 0)
-		{
-			return $query->row_array();
-		}
-
-		return FALSE;
+		return $this->CI->auth_model->get_user($id);
 	}
 
 	// ------------------------------------------------------------------------
@@ -343,24 +292,7 @@ class Auth {
 	 */
 	public function get_user_meta($id = 0)
 	{
-		$this->ci->db->select("{$this->_auth_user_meta_fields['key']} as key, {$this->_auth_user_meta_fields['value']} as value")
-			->from($this->_auth_table_user_meta)
-			->where($this->_auth_user_meta_fields['user_id'], $id);
-
-		$query = $this->ci->db->get();
-
-		if ($query->num_rows() > 0)
-		{
-			$result = array();
-
-			foreach ($query->result_array() as $item)
-			{
-				$result[$item['key']] = $item['value'];
-			}
-			return $result;
-		}
-
-		return FALSE;
+		return $this->CI->auth_model->get_user_meta($id);
 	}
 
 	// ------------------------------------------------------------------------
@@ -373,32 +305,7 @@ class Auth {
 	 */
 	public function get_by_username($username = '')
 	{
-		// Load email helper
-		$this->ci->load->helper('email');
-
-		// Query
-		$this->ci->db->select($this->_auth_users_fields['id'].' as id')
-			->from($this->_auth_table_users);
-
-		if (valid_email($username))
-		{
-			$this->ci->db->where($this->_auth_users_fields['email'], $username);
-		}
-		else
-		{
-			$this->ci->db->where($this->_auth_users_fields['username'], $username);
-		}
-
-		$query = $this->ci->db->get();
-
-		if ($query->num_rows() > 0)
-		{
-			$result = $query->row_array();
-
-			return $result['id'];
-		}
-
-		return FALSE;
+		return $this->CI->auth_model->get_by_username_email($username);
 	}
 
 	// ------------------------------------------------------------------------
@@ -425,55 +332,7 @@ class Auth {
 	 */
 	public function update_user($id, $data)
 	{
-		$user = array();
-		$meta = array();
-
-		foreach ($data as $key => $value)
-		{
-			// No need to update the key
-			if ($key != $this->_auth_users_fields['id'])
-			{
-				// General user information
-				if (in_array($key, array_values($this->_auth_users_fields)))
-				{
-					// Make sure the password is hashed if it exists
-					if ($key == $this->_auth_users_fields['password'])
-					{
-						$user[$key] = $this->_hash_password($value);
-					}
-
-					// Everything else
-					else
-					{
-						$user[$key] = $value;
-					}
-				}
-
-				// Meta information
-				else
-				{
-					$meta[] = array(
-						$this->_auth_user_meta_fields['key'] => $key,
-						$this->_auth_user_meta_fields['value'] => $value
-					);
-				}
-			}
-		}
-
-		// Update user data
-		if ( ! empty($user))
-		{
-			$this->ci->db->where($this->_auth_users_fields['id'], $id)
-				->update($this->_auth_table_users, $user);
-		}
-
-		// Update user meta data
-		if ( ! empty($meta))
-		{
-			$this->ci->db->update_batch($this->_auth_table_user_meta, $meta, $this->_auth_user_meta_fields['key']);
-		}
-
-		return TRUE;
+		return $this->CI->auth_model->update_user($id, $data);
 	}
 
 	// ------------------------------------------------------------------------
@@ -490,19 +349,13 @@ class Auth {
 		// Password wasn't passed. Generate one
 		if ( ! $password)
 		{
-			$password = $this->_generate_password();
+			$password = $this->generate_password();
 		}
 
 		// Hash the password
-		$password = array(
-			$this->_auth_users_fields['password'] => $this->_hash_password($password)
-		);
+		$hash = $this->hash_password($password);
 
-		// Update database
-		$this->ci->db->where($this->_auth_users_fields['id'], $id)
-			->update($this->_auth_table_users, $password);
-
-		return TRUE;
+		return $this->CI->auth_model->update_password($id, $hash);
 	}
 
 	// ------------------------------------------------------------------------
@@ -515,14 +368,7 @@ class Auth {
 	 */
 	public function activate_user($id)
 	{
-		$active = array(
-			$this->_auth_users_fields['active'] => 1
-		);
-
-		$this->ci->db->where($this->_auth_users_fields['id'], $id)
-			->update($this->_auth_table_users, $active);
-
-		return TRUE;
+		return $this->CI->auth_model->activate_deactivate_user($id, 1);
 	}
 
 	// ------------------------------------------------------------------------
@@ -535,14 +381,7 @@ class Auth {
 	 */
 	public function deactivate_user($id)
 	{
-		$active = array(
-			$this->_auth_users_fields['active'] => 0
-		);
-
-		$this->ci->db->where($this->_auth_users_fields['id'], $id)
-			->update($this->_auth_table_users, $active);
-
-		return TRUE;
+		return $this->CI->auth_model->activate_deactivate_user($id, 0);
 	}
 
 	// ------------------------------------------------------------------------
@@ -559,38 +398,21 @@ class Auth {
 	 */
 	public function generate_password($min = 6, $max = 12, $upper = TRUE, $num = TRUE, $special = FALSE)
 	{
-		return $this->_generate_password($min, $max, $upper, $num, $special);
-	}
-
-	// ------------------------------------------------------------------------
-
-	/**
-	 * Generate a random password (not hashed)
-	 *
-	 * @param int $min
-	 * @param int $max
-	 * @param bool $upper
-	 * @param bool $num
-	 * @param bool $special
-	 * @return string
-	 */
-	private function _generate_password($min = 6, $max = 12, $upper = TRUE, $num = TRUE, $special = FALSE)
-	{
 		$str = '';
 
 		$pool = 'abcdefghijklmnopqrstuvwxyz';
 
-		if($upper === TRUE)
+		if ($upper === TRUE)
 		{
 			$pool .= strtoupper($pool);
 		}
 
-		if($num === TRUE)
+		if ($num === TRUE)
 		{
 			$pool .= '1234567890';
 		}
 
-		if($special === TRUE)
+		if ($special === TRUE)
 		{
 			$pool .= '!@#$%&?';
 		}
@@ -608,44 +430,46 @@ class Auth {
 	// ------------------------------------------------------------------------
 
 	/**
+	 * Hash password string
+	 *
+	 * @param   string  $password
+	 * @return  string
+	 */
+	public function hash_password($password = '')
+	{
+		// Load encrypt library
+		$this->CI->load->library('encrypt');
+
+		return $this->CI->encrypt->sha1($this->CI->config->item('encryption_key').$password);
+	}
+
+	// ------------------------------------------------------------------------
+
+	/**
 	 * Set session for user. Create cookie if needed
 	 *
 	 * @param   int     $user_id
 	 * @param   bool    $cookie
+	 * @return void
 	 */
 	private function _set_session_values($user_id = 0, $cookie = FALSE)
 	{
 		if ($cookie === TRUE)
 		{
 			$cookie = array(
-				'name' => $this->_auth_key,
+				'name' => $this->_auth_user_session_key,
 				'value' => $user_id,
-				'expire' => $this->_auth_cookie_expire,
-				'domain' => $this->ci->config_item('cookie_domain'),
-				'path' => $this->ci->config_item('cookie_path'),
-				'secure' => $this->ci->config_item('cookie_secure'),
-				'prefix' => $this->ci->config_item('cookie_prefix'),
+				'expire' => $this->_auth_cookie_expire
 			);
 
-			$this->ci->input->set_cookie($cookie);
+			$this->CI->input->set_cookie($cookie);
 		}
 
-		$this->ci->session->set_userdata($this->_auth_key, $user_id);
-	}
-
-	// ------------------------------------------------------------------------
-
-	/**
-	 * Hash password string
-	 *
-	 * @param   string  $password
-	 * @return  string
-	 */
-	private function _hash_password($password = '')
-	{
-		$this->ci->load->library('encrypt');
-
-		return $this->ci->encrypt->sha1($this->ci->config->item('encryption_key').$password);
+		$this->CI->session->set_userdata($this->_auth_user_session_key, $user_id);
 	}
 
 }
+// END Auth class
+
+/* End of file Auth.php */
+/* Location: ./application/libraries/Auth.php */

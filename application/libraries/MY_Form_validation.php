@@ -1,14 +1,24 @@
-<?php if (!defined('BASEPATH')) exit('No direct script access allowed');
-
+<?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
+/**
+ * CodeIgniter Auth Class
+ *
+ * This class enables users to log in, log out, and update their profile.
+ *
+ * @package     CodeIgniter
+ * @subpackage  Libraries
+ * @category    Libraries
+ * @author      David Freerksen
+ * @link        https://github.com/dfreerksen/ci-auth
+ */
 class MY_Form_validation extends CI_Form_validation {
 
-	protected $ci;
+	protected $CI;
 
 	function __construct()
 	{
 		parent::__construct();
 
-		$this->ci =& get_instance();
+		$this->CI =& get_instance();
 	}
 
 	// ------------------------------------------------------------------------
@@ -65,20 +75,17 @@ class MY_Form_validation extends CI_Form_validation {
 	/**
 	 * Check if a specific value is in use
 	 *
-	 * @param	string
-	 * @param	field
-	 * @return	bool
+	 * @param   string  $str
+	 * @param   string  $field
+	 * @return  bool
 	 */
 	public function unique($str, $field)
 	{
 		list($table, $column) = explode(',', $field, 2);
 
-		$this->ci->form_validation->set_message('unique', 'The %s that you requested is already in use.');
+		$this->CI->form_validation->set_message('unique', 'The %s that you requested is already in use.');
 
-		$query = $this->ci->db->query("SELECT COUNT(*) AS dupe FROM {$this->ci->db->dbprefix($table)} WHERE {$column} = '{$str}'");
-		$row = $query->row();
-		
-		return ($row->dupe > 0) ? FALSE : TRUE;
+		return $this->CI->auth_model->is_unique($table, $column, $str);
 	}
 
 	// ------------------------------------------------------------------------
@@ -86,21 +93,17 @@ class MY_Form_validation extends CI_Form_validation {
 	/**
 	 * Check if a specific value is in use except when the value is attached to a specific row ID
 	 *
-	 * @param	string
-	 * @param	field
-	 * @return	bool
+	 * @param   string  $str
+	 * @param   string  $field
+	 * @return  bool
 	 */
-	public function unique_exclude($str, $field)
+	public function unique_except($str, $field)
 	{
-
 		list($table, $column, $fld, $id) = explode(',', $field, 4);
 
-		$this->ci->form_validation->set_message('unique_exclude', 'The %s that you requested is already in use.');
+		$this->CI->form_validation->set_message('unique_except', 'The %s that you requested is already in use.');
 
-		$query = $this->ci->db->query("SELECT COUNT(*) AS dupe FROM {$this->ci->db->dbprefix($table)} WHERE {$column} = '$str' AND {$fld} <> {$id}");
-		$row = $query->row();
-
-		return ($row->dupe > 0) ? FALSE : TRUE;
+		return $this->CI->auth_model->is_unique_except($table, $column, $str, $fld, $id);
 	}
 
 	// ------------------------------------------------------------------------
@@ -108,16 +111,24 @@ class MY_Form_validation extends CI_Form_validation {
 	/**
 	 * Login
 	 *
-	 * @param   $str
+	 * @param   string  $str
 	 * @return  bool
 	 */
 	public function login($str)
 	{
-		$this->ci->form_validation->set_message('login', 'Unable to log you in with the provided credentials.');
+		$this->CI->form_validation->set_message('login', 'Unable to log you in with the provided credentials.');
 
-		$user = $this->ci->auth->login($this->ci->input->get_post('username'), $this->ci->input->get_post('password'), $this->ci->input->get_post('remember'));
+		$username = $this->CI->input->get_post('username');
+		$password = $this->CI->input->get_post('password');
+		$remember = $this->CI->input->get_post('remember');
 
-		return ($user === FALSE) ? FALSE : TRUE;
+		$user = $this->CI->auth->login($username, $password, $remember);
+
+		return ($user) ? TRUE : FALSE;
 	}
 
 }
+// END MY_Form_validation class
+
+/* End of file MY_Form_validation.php */
+/* Location: ./application/libraries/MY_Form_validation.php */
