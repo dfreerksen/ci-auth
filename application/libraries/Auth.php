@@ -233,21 +233,21 @@ class Auth {
 		if ( ! is_array($username))
 		{
 			$username = array(
+				$this->_auth_users_fields['role_id'] => $role_id,
+				$this->_auth_users_fields['email'] => $email,
 				$this->_auth_users_fields['username'] => $username,
 				$this->_auth_users_fields['password'] => $password,
-				$this->_auth_users_fields['email'] => $email,
 				$this->_auth_users_fields['name'] => $name,
-				$this->_auth_users_fields['role_id'] => $role_id,
 				$this->_auth_users_fields['active'] => $active
 			);
 		}
 
 		$data = array_merge($data, array_filter($username));
 
-		$password = $this->hash_password($data['password']);
+		$password = $this->hash_password($username[$this->_auth_users_fields['password']]);
 
 		$data[$this->_auth_users_fields['password']] = $password;
-		$data[$this->_auth_users_fields['date_create']] = date('Y-m-d H:i:s');
+		$data[$this->_auth_users_fields['date_created']] = date('Y-m-d H:i:s');
 
 		$this->db->insert($this->_auth_table_users, $data);
 
