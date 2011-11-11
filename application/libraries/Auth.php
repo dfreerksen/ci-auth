@@ -249,9 +249,9 @@ class Auth {
 		$data[$this->_auth_users_fields['password']] = $password;
 		$data[$this->_auth_users_fields['date_created']] = date('Y-m-d H:i:s');
 
-		$this->db->insert($this->_auth_table_users, $data);
+		$this->CI->db->insert($this->_auth_table_users, $data);
 
-		return $this->db->insert_id();
+		return $this->CI->db->insert_id();
 	}
 
 	// ------------------------------------------------------------------------
