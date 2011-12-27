@@ -437,10 +437,7 @@ class Auth {
 	 */
 	public function hash_password($password = '')
 	{
-		// Load encrypt library
-		$this->CI->load->library('encrypt');
-
-		return $this->CI->encrypt->sha1($this->CI->config->item('encryption_key').$password);
+		return sha1($this->CI->config->item('encryption_key').$password);
 	}
 
 	// ------------------------------------------------------------------------

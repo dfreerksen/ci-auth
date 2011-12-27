@@ -59,7 +59,7 @@ class Auth_model extends CI_Model {
 
 	/**
 	 * Activate/Deactivate a user
-	 * 
+	 *
 	 * @param   int   $id
 	 * @param   int $active
 	 * @return  bool
@@ -140,7 +140,7 @@ class Auth_model extends CI_Model {
 
 	/**
 	 * Delete user
-	 * 
+	 *
 	 * @param   int $id
 	 * @return  bool
 	 */
@@ -182,6 +182,7 @@ class Auth_model extends CI_Model {
 		{
 			$this->db->where($this->auth->auth_users_fields['email'], $username);
 		}
+
 		else
 		{
 			$this->db->where($this->auth->auth_users_fields['username'], $username);
@@ -231,6 +232,7 @@ class Auth_model extends CI_Model {
 	{
 		// Build select string
 		$select = '';
+
 		foreach ($this->auth->auth_users_fields as $key => $field)
 		{
 			// Add a comma to separate the fields
