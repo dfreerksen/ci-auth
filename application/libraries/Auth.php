@@ -36,6 +36,8 @@ class Auth {
 
 	protected $_auth_user_session_key = 'user_id';
 
+	protected $_auth_encryption = 'md5';
+
 	/**
 	 * Constructor
 	 *
@@ -437,7 +439,15 @@ class Auth {
 	 */
 	public function hash_password($password = '')
 	{
-		return sha1($this->CI->config->item('encryption_key').$password);
+		if ($this->_auth_encryption == 'sha1')
+		{
+			return sha1($this->CI->config->item('encryption_key').$password);
+		}
+
+		else
+		{
+			return md5($this->CI->config->item('encryption_key').$password);
+		}
 	}
 
 	// ------------------------------------------------------------------------

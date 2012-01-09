@@ -22,3 +22,5 @@ $config['auth_user_meta_fields'] = array(
 );
 
 $config['auth_user_session_key'] = 'user_id';
+
+$config['auth_encryption'] = 'md5';
