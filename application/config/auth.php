@@ -9,8 +9,9 @@ $config['auth_users_fields'] = array(
 	'email' => 'email',
 	'username' => 'username',
 	'password' => 'password',
-	'name' => 'name',
-	'last_login' => 'last_login',
+	'first_name' => 'first_name',
+	'last_name' => 'last_name',
+	'date_last_login' => 'date_last_login',
 	'date_created' => 'date_created',
 	'active' => 'active'
 );

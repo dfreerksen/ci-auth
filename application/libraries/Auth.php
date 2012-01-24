@@ -14,29 +14,29 @@ class Auth {
 
 	protected $CI;
 
-	protected $_auth_cookie_expire = 0;
-
-	protected $_auth_table_users = 'users';
-	protected $_auth_users_fields = array(
-		'id' => 'id',
-		'role_id' => 'role_id',
-		'email' => 'email',
-		'username' => 'username',
-		'password' => 'password',
-		'name' => 'name',
-		'last_login' => 'last_login',
-		'date_created' => 'date_created',
-		'active' => 'active'
+	protected $_config = array(
+		'auth_cookie_expire' => 0,
+		'auth_table_users' => 'users',
+		'auth_users_fields' => array(
+			'id' => 'id',
+			'role_id' => 'role_id',
+			'email' => 'email',
+			'username' => 'username',
+			'password' => 'password',
+			'first_name' => 'first_name',
+			'last_name' => 'last_name',
+			'date_last_login' => 'date_last_login',
+			'date_created' => 'date_created',
+			'active' => 'active'
+		),
+		'auth_table_user_meta' => 'user_meta',
+		'auth_user_meta_fields' => array(
+			'id' => 'id',
+			'user_id' => 'user_id'
+		),
+		'auth_user_session_key' => 'user_id',
+		'auth_encryption' => 'md5'
 	);
-	protected $_auth_table_user_meta = 'user_meta';
-	protected $_auth_user_meta_fields = array(
-		'id' => 'id',
-		'user_id' => 'user_id'
-	);
-
-	protected $_auth_user_session_key = 'user_id';
-
-	protected $_auth_encryption = 'md5';
 
 	/**
 	 * Constructor
@@ -47,7 +47,7 @@ class Auth {
 	{
 		$this->CI =& get_instance();
 
-		// Load session library
+		// Load Session library
 		$this->CI->load->library('session');
 
 		// Load Auth model
@@ -89,7 +89,7 @@ class Auth {
 	 */
 	public function __get($key)
 	{
-		return isset($this->{'_'.$key}) ? $this->{'_'.$key} : NULL;
+		return array_key_exists($key, $this->_config) ? $this->_config[$key] : NULL;
 	}
 
 	// ------------------------------------------------------------------------
@@ -103,9 +103,9 @@ class Auth {
 	 */
 	public function __set($key, $value)
 	{
-		if (isset($this->{'_'.$key}))
+		if (array_key_exists($key, $this->_config))
 		{
-			$this->{'_'.$key} = $value;
+			$this->_config[$key] = $value;
 		}
 	}
 
@@ -119,15 +119,15 @@ class Auth {
 	public function logged_in()
 	{
 		// User is logged in with session
-		if ($this->CI->session->userdata($this->_auth_user_session_key) !== FALSE)
+		if ($this->CI->session->userdata($this->_config['auth_user_session_key']) !== FALSE)
 		{
 			return TRUE;
 		}
 
 		// User has a cookie set. Create session
-		elseif ($this->CI->input->cookie($this->_auth_user_session_key) !== FALSE)
+		elseif ($this->CI->input->cookie($this->_config['auth_user_session_key']) !== FALSE)
 		{
-			$user_id = $this->CI->input->cookie($this->_auth_user_session_key);
+			$user_id = $this->CI->input->cookie($this->_config['auth_user_session_key']);
 			$this->_set_session_values($user_id, TRUE);
 
 			return TRUE;
@@ -147,7 +147,7 @@ class Auth {
 	{
 		if ($this->logged_in())
 		{
-			return $this->CI->session->userdata($this->_auth_user_session_key);
+			return $this->CI->session->userdata($this->_config['auth_user_session_key']);
 		}
 
 		return 0;
@@ -191,11 +191,11 @@ class Auth {
 	 */
 	public function logout()
 	{
-		if ($this->CI->input->cookie($this->_auth_user_session_key) !== FALSE)
+		if ($this->CI->input->cookie($this->_config['auth_user_session_key']) !== FALSE)
 		{
 			$cookie = array(
-				'name' => $this->_auth_user_session_key,
-				'value' => $this->CI->input->cookie($this->_auth_user_session_key),
+				'name' => $this->_config['auth_user_session_key'],
+				'value' => $this->CI->input->cookie($this->_config['auth_user_session_key']),
 				'expire' => ''
 			);
 
@@ -215,45 +215,49 @@ class Auth {
 	 * @param   string  $username
 	 * @param   string  $password
 	 * @param   string  $email
-	 * @param   string  $name
+	 * @param   string  $first_name
+	 * @param   string  $last_name
 	 * @param   int     $role_id
 	 * @param   int     $active
 	 * @return  int
 	 */
-	public function create_user($username = '', $password = '', $email = '', $name = 'New User', $role_id = 1, $active = 1)
+	public function create_user($username = '', $password = '', $email = '', $first_name = 'New', $last_name = 'User', $role_id = 1, $active = 1)
 	{
 		$data = array(
-			$this->_auth_users_fields['role_id'] => 1,
-			$this->_auth_users_fields['email'] => '',
-			$this->_auth_users_fields['username'] => '',
-			$this->_auth_users_fields['password'] => '',
-			$this->_auth_users_fields['name'] => 'New User',
-			$this->_auth_users_fields['active'] => 1,
+			$this->_config['auth_users_fields']['role_id'] => 1,
+			$this->_config['auth_users_fields']['email'] => '',
+			$this->_config['auth_users_fields']['username'] => '',
+			$this->_config['auth_users_fields']['password'] => '',
+			$this->_config['auth_users_fields']['first_name'] => 'New',
+			$this->_config['auth_users_fields']['last_name'] => 'User',
+			$this->_config['auth_users_fields']['active'] => 1,
 		);
 
 		// If each value passed, add to data
 		if ( ! is_array($username))
 		{
 			$username = array(
-				$this->_auth_users_fields['role_id'] => $role_id,
-				$this->_auth_users_fields['email'] => $email,
-				$this->_auth_users_fields['username'] => $username,
-				$this->_auth_users_fields['password'] => $password,
-				$this->_auth_users_fields['name'] => $name,
-				$this->_auth_users_fields['active'] => $active
+				$this->_config['auth_users_fields']['role_id'] => $role_id,
+				$this->_config['auth_users_fields']['email'] => $email,
+				$this->_config['auth_users_fields']['username'] => $username,
+				$this->_config['auth_users_fields']['password'] => $password,
+				$this->_config['auth_users_fields']['first_name'] => $first_name,
+				$this->_config['auth_users_fields']['last_name'] => $last_name,
+				$this->_config['auth_users_fields']['active'] => $active
 			);
 		}
 
 		$data = array_merge($data, array_filter($username));
 
-		$password = $this->hash_password($username[$this->_auth_users_fields['password']]);
+		$password = $this->hash_password($username[$this->_config['auth_users_fields']['password']]);
 
-		$data[$this->_auth_users_fields['password']] = $password;
-		$data[$this->_auth_users_fields['date_created']] = date('Y-m-d H:i:s');
+		$data[$this->_config['auth_users_fields']['password']] = $password;
+		$data[$this->_config['auth_users_fields']['date_created']] = date('Y-m-d H:i:s');
 
-		$this->CI->db->insert($this->_auth_table_users, $data);
+		// Create new user
+		$id = $this->CI->auth_model->create_user($data);
 
-		return $this->CI->db->insert_id();
+		return $id;
 	}
 
 	// ------------------------------------------------------------------------
@@ -402,25 +406,42 @@ class Auth {
 	{
 		$str = '';
 
+		// We have to have at least 1 character. Not the best idea to just have only one character but that's the developers fault allowing it
+		if ($min < 1)
+		{
+			$min = 1;
+		}
+
+		// Max number of characters is a smaller number than the min number of characters
+		if ($max < $min)
+		{
+			$max = $min;
+		}
+
 		$pool = 'abcdefghijklmnopqrstuvwxyz';
 
+		// Include upper case letters
 		if ($upper === TRUE)
 		{
 			$pool .= strtoupper($pool);
 		}
 
+		// Include numbers
 		if ($num === TRUE)
 		{
 			$pool .= '1234567890';
 		}
 
+		// Include (certain) special characters
 		if ($special === TRUE)
 		{
 			$pool .= '!@#$%&?';
 		}
 
+		// Random length of password between min and max length
 		$random_length = rand($min, $max);
 
+		// Pull out random items
 		for ($i = 0; $i < $random_length; $i++)
 		{
 			$str .= substr($pool, mt_rand(0, strlen($pool) -1), 1);
@@ -439,14 +460,19 @@ class Auth {
 	 */
 	public function hash_password($password = '')
 	{
-		if ($this->_auth_encryption == 'sha1')
+		// Salt the password with the encryption key
+		$password = $this->CI->config->item('encryption_key').$password;
+
+		// SHA1 the password
+		if ($this->_config['auth_encryption'] == 'sha1')
 		{
-			return sha1($this->CI->config->item('encryption_key').$password);
+			return sha1($password);
 		}
 
+		// MD5 the password
 		else
 		{
-			return md5($this->CI->config->item('encryption_key').$password);
+			return md5($password);
 		}
 	}
 
@@ -464,15 +490,15 @@ class Auth {
 		if ($cookie === TRUE)
 		{
 			$cookie = array(
-				'name' => $this->_auth_user_session_key,
+				'name' => $this->_config['auth_user_session_key'],
 				'value' => $user_id,
-				'expire' => $this->_auth_cookie_expire
+				'expire' => $this->_config['auth_cookie_expire']
 			);
 
 			$this->CI->input->set_cookie($cookie);
 		}
 
-		$this->CI->session->set_userdata($this->_auth_user_session_key, $user_id);
+		$this->CI->session->set_userdata($this->_config['auth_user_session_key'], $user_id);
 	}
 
 }

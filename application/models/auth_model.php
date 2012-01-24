@@ -13,52 +13,33 @@
 class Auth_model extends CI_Model {
 
 	/**
-	 * Unique value
+	 * Create new user
 	 *
-	 * @param   string  $table
-	 * @param   string  $field
-	 * @param   string  $value
-	 * @return  bool
+	 * @param   array   $user_data
+	 * @return  int
 	 */
-	public function is_unique($table, $field, $value)
+	public function create_user($user_data = array())
 	{
-		$this->db->select('*')
-			->from($table)
-			->where($field, $value);
+		// Create user record
+		$this->db->insert($this->auth->auth_table_users, $user_data);
 
-		$count = $this->db->count_all_results();
+		// Unique user ID
+		$id = $this->db->insert_id();
 
-		return ($count) ? FALSE : TRUE;
+		// Create user meta record
+		$user_meta_data = array(
+			$this->auth->auth_user_meta_fields['user_id'] => $id
+		);
+
+		$this->db->insert($this->auth->auth_table_user_meta, $user_meta_data);
+
+		return $id;
 	}
 
 	// ------------------------------------------------------------------------
 
 	/**
-	 * Check if a specific value is in use except when the value is attached to a specific row ID
-	 *
-	 * @param   string  $table
-	 * @param   string  $field
-	 * @param   string  $value
-	 * @param   string  $key
-	 * @param   int|string  $id
-	 * @return  bool
-	 */
-	public function is_unique_except($table, $field, $value, $key, $id)
-	{
-		$this->db->select('*')
-			->from($table)
-			->where($field, $value)
-			->where($key.' !=', $id);
-
-		$count = $this->db->count_all_results();
-
-		return ($count) ? FALSE : TRUE;
-	}
-
-	// ------------------------------------------------------------------------
-
-	/**
-	 * Activate/Deactivate a user
+	 * Activate/deactivate a user
 	 *
 	 * @param   int   $id
 	 * @param   int $active
@@ -115,14 +96,9 @@ class Auth_model extends CI_Model {
 		$this->db->select($this->auth->auth_users_fields['id'].' as id')
 			->from($this->auth->auth_table_users);
 
-		if (valid_email($username))
-		{
-			$this->db->where($this->auth->auth_users_fields['email'], $username);
-		}
-		else
-		{
-			$this->db->where($this->auth->auth_users_fields['username'], $username);
-		}
+		$field = (valid_email($username)) ? 'email' : 'username';
+
+		$this->db->where($this->auth->auth_users_fields[$field], $username);
 
 		$query = $this->db->get();
 
@@ -134,27 +110,6 @@ class Auth_model extends CI_Model {
 		}
 
 		return FALSE;
-	}
-
-	// ------------------------------------------------------------------------
-
-	/**
-	 * Delete user
-	 *
-	 * @param   int $id
-	 * @return  bool
-	 */
-	public function delete_user($id = 0)
-	{
-		// Delete data from user meta table
-		$this->db->where($this->auth->auth_users_fields['id'], $id)
-			->delete($this->auth->auth_table_user_meta);
-
-		// Delete data from users table
-		$this->db->where($this->auth->auth_user_meta_fields['user_id'], $id)
-			->delete($this->auth->auth_table_users);
-
-		return TRUE;
 	}
 
 	// ------------------------------------------------------------------------
@@ -178,15 +133,9 @@ class Auth_model extends CI_Model {
 			->from($this->auth->auth_table_users)
 			->where($this->auth->auth_users_fields['password'], $password);
 
-		if (valid_email($username))
-		{
-			$this->db->where($this->auth->auth_users_fields['email'], $username);
-		}
+		$field = (valid_email($username)) ? 'email' : 'username';
 
-		else
-		{
-			$this->db->where($this->auth->auth_users_fields['username'], $username);
-		}
+		$this->db->where($this->auth->auth_users_fields[$field], $username);
 
 		$query = $this->db->get();
 
@@ -198,7 +147,7 @@ class Auth_model extends CI_Model {
 		}
 
 		return $user_id;
-}
+	}
 
 	// ------------------------------------------------------------------------
 
@@ -212,7 +161,7 @@ class Auth_model extends CI_Model {
 	{
 		// Data for the update
 		$data = array(
-			$this->auth->auth_users_fields['last_login'] => date('Y-m-d H:i:s')
+			$this->auth->auth_users_fields['date_last_login'] => date('Y-m-d H:i:s')
 		);
 
 		// Update the database with the last login time
@@ -231,22 +180,13 @@ class Auth_model extends CI_Model {
 	public function get_user($id = 0)
 	{
 		// Build select string
-		$select = '';
-
 		foreach ($this->auth->auth_users_fields as $key => $field)
 		{
-			// Add a comma to separate the fields
-			if ($select)
-			{
-				$select .= ', ';
-			}
-
-			$select .= $field.' as '.$key;
+			$this->db->select($field.' as '.$key);
 		}
 
 		// Query
-		$this->db->select($select)
-			->from($this->auth->auth_table_users)
+		$this->db->from($this->auth->auth_table_users)
 			->where($this->auth->auth_users_fields['id'], $id);
 
 		$query = $this->db->get();
@@ -275,23 +215,24 @@ class Auth_model extends CI_Model {
 
 		$query = $this->db->get();
 
-		if ($query->num_rows() > 0)
+		$meta = array();
+
+		// Remove unique ID and user ID fields
+		foreach ($query->row_array() as $item)
 		{
-			$result = array();
-
-			foreach ($query->result_array() as $item)
+			// We don't care about the meta unique id or the user id
+			if ( ! in_array($item['key'], array_values($this->auth->auth_user_meta_fields)))
 			{
-				// We don't care about the meta unique id or the user id
-				if ( ! in_array($item['key'], array_values($this->auth->auth_user_meta_fields)))
-				{
-					$result[$item['key']] = $item['value'];
-				}
+				$meta[$item['key']] = $item['value'];
 			}
-
-			return $result;
 		}
 
-		return FALSE;
+		if (empty($meta))
+		{
+			return FALSE;
+		}
+
+		return $meta;
 	}
 
 	// ------------------------------------------------------------------------
