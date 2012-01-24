@@ -115,6 +115,27 @@ class Auth_model extends CI_Model {
 	// ------------------------------------------------------------------------
 
 	/**
+	 * Delete user
+	 *
+	 * @param   int     $id
+	 * @return  bool
+	 */
+	public function delete_user($id = 0)
+	{
+		// Delete data from user meta table
+		$this->db->where($this->auth->auth_users_fields['id'], $id)
+			->delete($this->auth->auth_table_user_meta);
+
+		// Delete data from users table
+		$this->db->where($this->auth->auth_user_meta_fields['user_id'], $id)
+			->delete($this->auth->auth_table_users);
+
+		return TRUE;
+	}
+
+	// ------------------------------------------------------------------------
+
+	/**
 	 * Test if valid login
 	 * @param   string  $username
 	 * @param   string  $password
