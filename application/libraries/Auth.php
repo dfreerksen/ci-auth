@@ -173,7 +173,7 @@ class Auth {
 		if ($user_id)
 		{
 			// Set the session
-			$this->_set_session_values($user_id, $cookie);
+			$this->_set_session_values($user_id, (bool)$cookie);
 
 			// Update the database with the last login time
 			$this->CI->auth_model->update_last_login($user_id);
