@@ -207,10 +207,9 @@ class Auth_model extends CI_Model {
 		}
 
 		// Query
-		$this->db->from($this->auth->auth_table_users)
-			->where($this->auth->auth_users_fields['id'], $id);
-
-		$query = $this->db->get();
+		$query = $this->db->from($this->auth->auth_table_users)
+			->where($this->auth->auth_users_fields['id'], $id)
+			->get();
 
 		if ($query->num_rows() > 0)
 		{
@@ -230,21 +229,20 @@ class Auth_model extends CI_Model {
 	 */
 	public function get_user_meta($id = 0)
 	{
-		$this->db->select('*')
+		$query = $this->db->select('*')
 			->from($this->auth->auth_table_user_meta)
-			->where($this->auth->auth_user_meta_fields['user_id'], $id);
-
-		$query = $this->db->get();
+			->where($this->auth->auth_user_meta_fields['user_id'], $id)
+			->get();
 
 		$meta = array();
 
 		// Remove unique ID and user ID fields
-		foreach ($query->row_array() as $item)
+		foreach ($query->row_array() as $key => $value)
 		{
 			// We don't care about the meta unique id or the user id
-			if ( ! in_array($item['key'], array_values($this->auth->auth_user_meta_fields)))
+			if ( ! in_array($key, array_values($this->auth->auth_user_meta_fields)))
 			{
-				$meta[$item['key']] = $item['value'];
+				$meta[$key] = $value;
 			}
 		}
 
@@ -309,7 +307,7 @@ class Auth_model extends CI_Model {
 		// Update user meta data
 		if ( ! empty($meta))
 		{
-			$this->db->where($this->auth->auth_users_fields['id'], $id)
+			$this->db->where($this->auth->auth_user_meta_fields['user_id'], $id)
 				->update($this->auth->auth_table_user_meta, $meta);
 		}
 
